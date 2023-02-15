@@ -9,7 +9,7 @@ using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.Serialization;
 
-public class BgmManager : MonoBehaviour, INetworkComponent, INetworkObject
+public class BgmManager : MonoBehaviour
 {
     [FormerlySerializedAs("BackMusic")] public AudioSource backMusic;
     private NetworkContext netContext;
@@ -17,7 +17,7 @@ public class BgmManager : MonoBehaviour, INetworkComponent, INetworkObject
     public bool ready;
 
     private RoomClient roomClient;
-    NetworkId INetworkObject.Id => new NetworkId(685670);
+    public NetworkId NetworkId => new NetworkId(685670);
     
     public TrainManager trainManager;
     public bool running;
@@ -57,10 +57,10 @@ public class BgmManager : MonoBehaviour, INetworkComponent, INetworkObject
     }
     
     private void SendAudioState(IPeer newPeer) {
-        int mySuffix = roomClient.Me.UUID.Last();
+        int mySuffix = roomClient.Me.uuid.Last();
 
         // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-        bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+        bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
             .All(peerSuffix => peerSuffix > mySuffix);
 
 

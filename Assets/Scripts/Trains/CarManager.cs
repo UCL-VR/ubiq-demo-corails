@@ -6,31 +6,24 @@ using Ubiq.Rooms;
 using UnityEngine;
 
 namespace Trains {
-    public class CarManager : MonoBehaviour, INetworkComponent, INetworkObject {
+    public class CarManager : MonoBehaviour {
         public TrainManager trainManager;
         public TrackManagerSnake trackManager;
         public int trackIndex;
         private int startingTrackIndex;
 
-        
         public TrackPieceSnake currentTrack;
         public TrackPieceSnake nextTrack;
         public TrackPieceSnake nextNextTrack;
         public float distance;
         public uint presetID;
-        public NetworkScene networkScene;
         public bool ready;
         private NetworkContext netContext;
 
         private RoomClient roomClient;
         
-
         private void Awake() {
-            startingTrackIndex = trackIndex;
-            networkScene = (NetworkScene) FindObjectOfType(typeof(NetworkScene));
-            roomClient = networkScene.GetComponent<RoomClient>();
-            roomClient.OnPeerAdded.AddListener(SendCarState);
-            roomClient.OnJoinedRoom.AddListener(InitTrain);
+            startingTrackIndex = trackIndex;            
         }
         
         public void Reset() {
@@ -39,12 +32,14 @@ namespace Trains {
             Start();
         }
 
-
         private void Start() {
             trackIndex = startingTrackIndex;
             currentTrack = null;
             netContext = NetworkScene.Register(this);
             transform.position = trackManager.tracks[trackIndex].gameObject.transform.position;
+            roomClient = RoomClient.Find(this);
+            roomClient.OnPeerAdded.AddListener(SendCarState);
+            roomClient.OnJoinedRoom.AddListener(InitTrain);
         }
         
         private void UpdateTrack() {
@@ -105,13 +100,13 @@ namespace Trains {
             ready = true;
         }
 
-        NetworkId INetworkObject.Id => new NetworkId(presetID);
+        public NetworkId NetworkId => new NetworkId(presetID);
 
         private void SendCarState(IPeer newPeer) {
-            int mySuffix = roomClient.Me.UUID.Last();
+            int mySuffix = roomClient.Me.uuid.Last();
 
             // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
                 .All(peerSuffix => peerSuffix > mySuffix);
 
             if (!doSend) return;

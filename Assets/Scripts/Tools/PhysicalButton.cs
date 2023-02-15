@@ -4,7 +4,7 @@ using Ubiq.XR;
 using UnityEngine;
 
 namespace Tools {
-    public abstract class PhysicalButton : MonoBehaviour, INetworkComponent, INetworkObject, IGraspable {
+    public abstract class PhysicalButton : MonoBehaviour, IGraspable {
         private NetworkContext ctx;
         private Transform follow;
 
@@ -75,8 +75,6 @@ namespace Tools {
 
             particles = msg.particles;
         }
-
-        public NetworkId Id { get; set; }
 
         public abstract void Run();
 

@@ -5,30 +5,27 @@ using System.Linq;
 using ResourceDrops;
 using Ubiq.Messaging;
 using Ubiq.Rooms;
-using Ubiq.Samples;
+using Ubiq.Spawning;
 using UnityEngine;
 using UnityEngine.Events;
-using WebSocketSharp;
 using Terrain = Terrain_Generation.Terrain;
 
 namespace Networking {
-    public class WorldManager : MonoBehaviour, INetworkComponent, INetworkObject {
-        private readonly Queue<string> moveQueue = new Queue<string>();
+    public class WorldManager : MonoBehaviour 
+        {
+        // This list contains all the environment assets that have been harvested since the start
+        private List<string> destroyedObjects = new List<string>();
 
-        private readonly Dictionary<string, Tuple<string, bool>> removedObjects =
-            new Dictionary<string, Tuple<string, bool>>();
+        // This list contains all the resources spawned as a result of harvesting
+        private Dictionary<string, int> spawnedObjects = new Dictionary<string, int>();
 
-        private readonly Dictionary<string, Vector3> resDropPos = new Dictionary<string, Vector3>();
+        private readonly Queue<Tuple<string, GameObject>> wmEventQueue = new Queue<Tuple<string, GameObject>>();
 
-        private readonly Queue<Tuple<string, GameObject, bool>> wmEventQueue =
-            new Queue<Tuple<string, GameObject, bool>>();
+        public NetworkId NetworkId => new NetworkId(2815);
 
         private NetworkContext netContext;
 
-        public WorldUpdateEvent OnWorldUpdate;
-        private int peersJoined = 0;
         private bool ready = true; // ready to start processing network events (or just in single-player)
-
 
         private RoomClient roomClient;
         private Scoring.ScoringEvent onScoreEvent;
@@ -36,59 +33,26 @@ namespace Networking {
         private Terrain terrainGenerationComponent;
         private int worldInitState;
 
-        private void Awake() {
-            roomClient = GetComponentInParent<RoomClient>();
-            roomClient.OnPeerAdded.AddListener(SendWorldStateToNewPeer);
-            roomClient.OnJoinedRoom.AddListener(UpdateInitState);
-
-            terrainGenerationComponent = GameObject.Find("Generation").GetComponent<Terrain>();
-        }
-
+        public PrefabCatalogue worldManagerSpawnable;
 
         // Start is called before the first frame update
         private void Start() {
-            OnWorldUpdate = new WorldUpdateEvent();
-            OnWorldUpdate.AddListener(ProcessWorldUpdate);
+           
             netContext = NetworkScene.Register(this);
+            
             onScoreEvent = GameObject.Find("Scoring").GetComponent<Scoring>().OnScoreEvent;
+
+            roomClient = RoomClient.Find(this);
+            roomClient.OnPeerAdded.AddListener(SendWorldStateToNewPeer);
+            roomClient.OnJoinedRoom.AddListener(UpdateInitState);
+            terrainGenerationComponent = GameObject.Find("Generation").GetComponent<Terrain>();
+
             Debug.Log("[WorldManager] Hello world!");
         }
 
         private void Update() {
             ProcessQueueEvent();
         }
-
-        public void ProcessMessage(ReferenceCountedSceneGraphMessage message) {
-            var wmm = message.FromJson<WorldManagerMessage>();
-
-            if (wmm.WorldInitState > 0 && !ready) {
-                // if world already ready, ignore message
-                Debug.LogWarning($"Processing initial world sync message, initState: {wmm.WorldInitState}");
-                RegenerateTerrain(wmm.WorldInitState);
-                ready = true;
-            }
-
-            Debug.Log($">>>> destroying \'{wmm.NewRemovedObject}\'");
-
-            GameObject toDestroy = GameObject.Find(wmm.NewRemovedObject);
-            if (toDestroy == null) {
-                Debug.LogWarning($"Couldn't find gameobject {wmm.NewRemovedObject}");
-                return;
-            }
-
-            QueueWorldUpdate(false, wmm.NewRemovedObject); // queue the actual destroy
-            Vector3 position = toDestroy.transform.position;
-
-            if (wmm.NewSpawnedObject.IsNullOrEmpty()) return;
-            removedObjects[wmm.NewRemovedObject] = new Tuple<string, bool>(wmm.NewSpawnedObject, false);
-
-            Debug.Log($"Enqueuing new object to be moved '{wmm.NewSpawnedObject}'");
-            moveQueue.Enqueue(wmm.NewSpawnedObject);
-            resDropPos[wmm.NewSpawnedObject] = position;
-        }
-
-        NetworkId INetworkObject.Id => new NetworkId(2815);
-
 
         private IEnumerator WorldManagerSync() {
             Debug.LogWarning("[ONJOINEDROOM] Joined room, waiting for peers...");
@@ -111,13 +75,6 @@ namespace Networking {
                 yield break; // don't destroy terrain, peer(s) exist so wait for initState to be sent by someone else
             }
 
-            Debug.LogWarning("[ONJOINEDROOM] no peers in room after timeout elapsed, setting up new world");
-            if (FindObjectsOfType(typeof(GameObject)) is GameObject[] gameObjects) // clear out network spawned objects
-                foreach (GameObject go in gameObjects)
-                    if (go.name.StartsWith("SpawnedObject-"))
-                        Destroy(go);
-            removedObjects.Clear();
-            resDropPos.Clear();
             RegenerateTerrain(terrainGenerationComponent.initState);
             ready = true; // we just joined (created) an empty room, we get to set the room's seed.
         }
@@ -127,153 +84,133 @@ namespace Networking {
             wmEventQueue.Clear();
         }
 
-        // private void HandlePeerAdded(IPeer newPeer)
-        // {
-        //     
-        // }
-
         private void SendWorldStateToNewPeer(IPeer newPeer) {
-            Debug.Log($"New peer joined: {newPeer.UUID}");
-            Debug.LogWarning(removedObjects);
-            int mySuffix = roomClient.Me.UUID.Last();
+            Debug.Log($"New peer joined: {newPeer.uuid}");
+            int mySuffix = roomClient.Me.uuid.Last();
 
             // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
                 .All(peerSuffix => peerSuffix > mySuffix);
-            Debug.LogWarning("SendWorldStateToNewPeer");
-            Debug.LogWarning(doSend);
-            Debug.LogWarning(ready);
-            Debug.LogWarning("---------");
 
             if (!doSend || !ready) return;
+
+            Debug.LogWarning("Sending World State to New Peer");
 
             var m = new WorldManagerMessage {
                 WorldInitState = worldInitState
             };
             netContext.SendJson(m);
 
-            foreach (WorldManagerMessage message in removedObjects.Select(removedObject => new WorldManagerMessage {
-                NewRemovedObject = removedObject.Key,
-                WorldInitState = worldInitState,
-                NewSpawnedObject = removedObject.Value.Item1
-            })) {
-                Debug.Log($"Sending world sync message: '{message.NewRemovedObject}', '{message.NewSpawnedObject}'");
-                netContext.SendJson(message);
+            foreach (var item in destroyedObjects) {
+                netContext.SendJson(new WorldManagerMessage() {
+                    ToRemove = item
+                });
+            }
+
+            foreach (var item in spawnedObjects) {
+                netContext.SendJson(new WorldManagerMessage() {
+                    ToCreateName = item.Key,
+                    ToCreateIndex = item.Value
+                });
+            }
+
+            foreach (var item in spawnedObjects) {
+                var g = GameObject.Find(item.Key);
+                if (g) {
+                    g.GetComponent<ResourceDropManager>().ForceSendPositionUpdate();
+                }
             }
         }
 
         private void UpdateInitState(IRoom newRoom) {
-            // ready = false;
-            // if (roomClient.Peers.Any()) {
-            //     Debug.LogWarning("[ONJOINEDROOM] room has peers, waiting for sync message");
-            //     return; // don't destroy terrain, peer(s) exist so wait for initState to be sent by someone else
-            // }
-            //
-            // Debug.LogWarning("[ONJOINEDROOM] no peers in room, setting up new world");
-            //
-            // // reworking this
-            // // RegenerateTerrain(terrainGenerationComponent.initState);
-            // // ready = true; // we just joined (created) an empty room, we get to set the room's seed.]
             StartCoroutine(WorldManagerSync());
         }
 
-        private string AddRemovedObject(string toRemove, GameObject toSpawn = null) {
-            GameObject toRemoveGameObject = GameObject.Find(toRemove);
-            if (toRemove == null || removedObjects.ContainsKey(toRemove) && removedObjects[toRemove].Item2) return null;
-
-
-            string newSpawnedObjectName = null;
-            if (toSpawn != null) // only local instance has toSpawn set
-            {
-                GameObject spawnedObject = NetworkSpawner.SpawnPersistent(this, toSpawn);
-                newSpawnedObjectName = $"SpawnedObject-{((INetworkObject)spawnedObject.GetSpawnableInChildren()).Id}";
-                Vector3 position = toRemoveGameObject.transform.position;
-                resDropPos[newSpawnedObjectName] = position;
-                moveQueue.Enqueue(newSpawnedObjectName);
-            }
-
-            if (toRemoveGameObject.TryGetComponent(out ResourceDropManager resourceDropManager))
-                onScoreEvent.Invoke(resourceDropManager.type == "wood"
-                    ? ScoreEventType.WoodPickUp
-                    : ScoreEventType.StonePickUp);
-
-            Destroy(toRemoveGameObject);
-
-            return newSpawnedObjectName;
+        private struct WorldManagerMessage {
+            public int WorldInitState;
+            public string ToRemove;
+            public int ToCreateIndex;
+            public string ToCreateName;
+            public Vector3 ToCreatePosition;
         }
 
-        private void DoDestroy() {
-            // make a DestroyLocal and DestroyRemote
-            if (!ready || wmEventQueue.Count == 0) return;
-            (string toDestroy, GameObject toSpawn, bool isLocal) = wmEventQueue.Dequeue();
-            Debug.Log($"Processing {(isLocal ? "local" : "remote")} world event");
-            Debug.Log(toDestroy);
-            string newSpawnedObjectName = AddRemovedObject(toDestroy, toSpawn);
-            // if (newSpawnedObjectName == null || !isLocal) return;
-
-            if (!isLocal) return;
-            removedObjects[toDestroy] =
-                new Tuple<string, bool>(newSpawnedObjectName,
-                    true); // update this only if local, if remote, newSpawnedObjectName is empty/null
-            var msg = new WorldManagerMessage {
-                NewRemovedObject = toDestroy,
-                NewSpawnedObject = newSpawnedObjectName
-            };
-            if (toDestroy.StartsWith("SpawnedObject-"))
-                roomClient.Room[toDestroy] = null; // deletes the key, <ubiq>/Runtime/Dictionaries/Types.cs:67
-            netContext.SendJson(msg); // sends network message if event origin is local
-        }
-
-        private void DoMove() {
-            if (moveQueue.Count == 0) return;
-            // Debug.LogWarning($"MOVE QUEUE: {moveQueue.Count}");
-            string objectToMove = moveQueue.Dequeue();
-            // Debug.Log($"Trying to move '{objectToMove}'");
-            GameObject toMove = GameObject.Find(objectToMove);
-            if (toMove == null) {
-                // Debug.Log($"Couldn't find '{objectToMove}'");
-                moveQueue.Enqueue(objectToMove); // object hasn't spawned yet
+        // This method processes the wmEventQueue, which is populated locally
+        private void DoDestroyAndReplace() {
+            if (!ready || wmEventQueue.Count == 0) {
                 return;
             }
 
-            Vector3 targetPosition = resDropPos[objectToMove];
-            Debug.Log($"{objectToMove} moved to target position {targetPosition}");
-            toMove.transform.position = targetPosition;
+            (string toDestroy, GameObject toSpawn) = wmEventQueue.Dequeue();
+
+            var msg = new WorldManagerMessage();
+            msg.ToCreateIndex = -1;
+            msg.ToRemove = toDestroy;
+
+            var previous = GameObject.Find(toDestroy);
+            var position = previous.transform.position;
+
+            if (previous.TryGetComponent(out ResourceDropManager resourceDropManager)) {
+                onScoreEvent.Invoke(resourceDropManager.type == "wood"
+                    ? ScoreEventType.WoodPickUp
+                    : ScoreEventType.StonePickUp);
+                spawnedObjects.Remove(previous.name);
+            }
+            else {
+                destroyedObjects.Add(previous.name);
+            }
+
+            GameObject.Destroy(previous);
+
+            if (toSpawn != null) {
+                var replacement = GameObject.Instantiate(toSpawn);
+                replacement.transform.position = position;
+                replacement.name = Guid.NewGuid().ToString();
+
+                msg.ToCreateIndex = worldManagerSpawnable.prefabs.IndexOf(toSpawn);
+                msg.ToCreatePosition = position;
+                msg.ToCreateName = replacement.name;
+
+                spawnedObjects.Add(msg.ToCreateName, msg.ToCreateIndex);
+            }
+
+            netContext.SendJson(msg);            
         }
 
         private void ProcessQueueEvent() // process one queue event
         {
-            DoMove();
-            DoDestroy();
+            DoDestroyAndReplace();
         }
 
-        // toSpawn can be a GameObject because it's local (not from network stack) and won't get null-ed for whatever reason
-        private void QueueWorldUpdate(bool isLocal, string toRemove, GameObject toSpawn = null) {
-            Debug.Log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-            Debug.Log(toRemove);
-            Tuple<string, GameObject, bool> a = new Tuple<string, GameObject, bool>(toRemove, toSpawn, isLocal);
-            wmEventQueue.Enqueue(a);
-            Debug.Log(a);
+        public void UpdateWorld(GameObject before, GameObject after) {
+            wmEventQueue.Enqueue(new Tuple<string, GameObject>(before.name, after)); // event queue will be handled by DoDestroyAndReplace
         }
 
-        private void ProcessWorldUpdate(GameObject updatedGameObject, GameObject dropPrefab) {
-            Debug.LogWarning("ONWORLDUPDATE EVENT CALLBACK");
-            Debug.LogWarning($"local: destroy '{updatedGameObject.name}'");
-            QueueWorldUpdate(true, updatedGameObject.name, dropPrefab);
-        }
+        public void ProcessMessage(ReferenceCountedSceneGraphMessage message) {
+            var wmm = message.FromJson<WorldManagerMessage>();
 
-        public void MoveDrop(string dropObjName, Vector3 targetPosition) {
-            if (!resDropPos.ContainsKey(dropObjName)) return;
-            resDropPos[dropObjName] = targetPosition;
-        }
+            if (wmm.WorldInitState > 0 && !ready) {
+                // if world already ready, ignore message
+                Debug.Log($"Processing initial world sync message, seed: {wmm.WorldInitState}");
+                RegenerateTerrain(wmm.WorldInitState);
+                ready = true;
+            }
 
-        public class WorldUpdateEvent : UnityEvent<GameObject, GameObject> { }
+            var toDestroy = GameObject.Find(wmm.ToRemove);
+            if (toDestroy) {
+                if (toDestroy.TryGetComponent(out ResourceDropManager resourceDropManager)) {
+                    spawnedObjects.Remove(toDestroy.name);
+                }
+                else {
+                    destroyedObjects.Add(toDestroy.name);
+                }
+                GameObject.Destroy(toDestroy);
+            }
 
-
-        private struct WorldManagerMessage {
-            public string NewRemovedObject;
-            public string NewSpawnedObject;
-            public int WorldInitState;
+            if (wmm.ToCreateIndex >= 0) {
+                var spawned = GameObject.Instantiate(worldManagerSpawnable.prefabs[wmm.ToCreateIndex]);
+                spawned.name = wmm.ToCreateName;
+                spawned.transform.position = wmm.ToCreatePosition;
+            }
         }
     }
 }

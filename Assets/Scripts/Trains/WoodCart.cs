@@ -8,7 +8,7 @@ using Ubiq.Messaging;
 using Ubiq.Rooms;
 using UnityEngine;
 
-public class WoodCart : MonoBehaviour, INetworkComponent, INetworkObject {
+public class WoodCart : MonoBehaviour {
     [SerializeField] private int woodCount;
 
     public GameObject woodObj;
@@ -64,14 +64,15 @@ public class WoodCart : MonoBehaviour, INetworkComponent, INetworkObject {
     }
 
     private void Awake() {
-        networkScene = (NetworkScene) FindObjectOfType(typeof(NetworkScene));
-        roomClient = networkScene.GetComponent<RoomClient>();
-        roomClient.OnPeerAdded.AddListener(SendTrainState);
-        roomClient.OnJoinedRoom.AddListener(InitState);
     }
 
     private void Start() {
         netContext = NetworkScene.Register(this);
+        networkScene = netContext.Scene;
+        roomClient = RoomClient.Find(this);
+        roomClient.OnPeerAdded.AddListener(SendTrainState);
+        roomClient.OnJoinedRoom.AddListener(InitState);
+        worldManager = GameObject.Find("World Manager").GetComponent<WorldManager>();
     }
 
     private void OnTriggerEnter(Collider other) {
@@ -90,8 +91,7 @@ public class WoodCart : MonoBehaviour, INetworkComponent, INetworkObject {
             if (!other.TryGetComponent(out ResourceDropManager resourceDropManager)) return;
             if (resourceDropManager.type == "wood")
             {
-                if (worldManager == null) worldManager = GameObject.Find("Scene Manager").GetComponent<WorldManager>();
-                worldManager.OnWorldUpdate.Invoke(other.gameObject, null); // destroy and don't spawn anything
+                worldManager.UpdateWorld(other.gameObject, null); // destroy and don't spawn anything
                 WoodCount += 1;
                 netContext.SendJson(new Message(WoodCount, false));
             }
@@ -106,7 +106,7 @@ public class WoodCart : MonoBehaviour, INetworkComponent, INetworkObject {
         ready = true;
     }
 
-    NetworkId INetworkObject.Id => new NetworkId(603010);
+    public NetworkId NetworkId => new NetworkId(603010);
 
     private void UpdateWood() {
         while (currentObjs.Count > WoodCount) {
@@ -115,20 +115,19 @@ public class WoodCart : MonoBehaviour, INetworkComponent, INetworkObject {
         }
 
         while (currentObjs.Count < WoodCount && currentObjs.Count < positions.Count) {
-            GameObject spawned = Instantiate(woodObj, transform);
-            spawned.transform.localScale = new Vector3(0.01f, 0.01f, 0.007f);
-            spawned.transform.localRotation = rotations[currentObjs.Count];
+            GameObject spawned = Instantiate(woodObj, transform, false);
             spawned.transform.localPosition = positions[currentObjs.Count];
-
+            spawned.transform.localRotation = rotations[currentObjs.Count];
+            spawned.transform.localScale = new Vector3(0.01f, 0.01f, 0.007f);
             currentObjs.Add(spawned);
         }
     }
 
     private void SendTrainState(IPeer newPeer) {
-        int mySuffix = roomClient.Me.UUID.Last();
+        int mySuffix = roomClient.Me.uuid.Last();
 
         // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-        bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+        bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
             .All(peerSuffix => peerSuffix > mySuffix);
 
 

@@ -1,11 +1,10 @@
 using Networking;
 using Ubiq.Messaging;
-using Ubiq.Samples;
 using Ubiq.XR;
 using UnityEngine;
 
 namespace ResourceDrops {
-    public class ResourceDropManager : MonoBehaviour, INetworkComponent, INetworkObject, IGraspable, ISpawnable {
+    public class ResourceDropManager : MonoBehaviour, IGraspable {
         public bool owner;
         public string type;
         private Vector3 lastPublishedPosition;
@@ -13,10 +12,11 @@ namespace ResourceDrops {
         private NetworkContext ctx;
         private Transform follow;
         private Rigidbody rb;
-        private WorldManager worldManager;
 
         public void Start() {
-            OnSpawned(true);
+            ctx = NetworkScene.Register(this);
+            gameObject.tag = "ResourceDrop";
+            rb = GetComponent<Rigidbody>();
         }
 
         // Update is called once per frame
@@ -24,15 +24,15 @@ namespace ResourceDrops {
             // if (!owner) return;
             if (follow != null)
             {
-                Transform transform1 = transform;
                 Vector3 controllerPosition = follow.transform.position;
-                transform1.position = new Vector3(controllerPosition.x, controllerPosition.y - (float) 0.1,
+                transform.position = new Vector3(controllerPosition.x, controllerPosition.y - (float) 0.1,
                     controllerPosition.z);
-                transform1.rotation = follow.transform.rotation;
-                transform1.Rotate(50, 0, 0);
+                transform.rotation = follow.transform.rotation;
+                transform.Rotate(50, 0, 0);
             }
-            if (Vector3.Distance(lastPublishedPosition, transform.position) <= 0.2) return;
-            // ctx.SendJson(new TransformMessage(transform));
+            if (Vector3.Distance(lastPublishedPosition, transform.position) <= 0.2) {
+                return;
+            }
             SendPositionUpdate();
         }
 
@@ -51,35 +51,16 @@ namespace ResourceDrops {
 
         public void ProcessMessage(ReferenceCountedSceneGraphMessage message) {
             var msg = message.FromJson<TransformMessage>();
-            Transform transform1 = transform;
-            transform1.position = msg.position;
-            transform1.rotation = msg.rotation;
-            if (worldManager == null) worldManager = GameObject.Find("Scene Manager").GetComponent<WorldManager>();
-            worldManager.MoveDrop(name, transform.position);
-            rb.isKinematic = true;
-            rb.isKinematic = false;
-            worldManager.MoveDrop(name, msg.position);
+            transform.position = msg.position;
+            transform.rotation = msg.rotation;
             lastPublishedPosition = msg.position;
         }
 
-        public NetworkId Id { get; set; }
-
-        public void OnSpawned(bool local) {
-            ctx = NetworkScene.Register(this);
-            GameObject o = gameObject;
-            o.tag = "ResourceDrop";
-            o.name = $"SpawnedObject-{Id}";
-            rb = GetComponent<Rigidbody>();
-        }
-
         public void ForceSendPositionUpdate() {
-            // ctx.SendJson(new TransformMessage(transform));
             SendPositionUpdate();
         }
 
         private void SendPositionUpdate() {
-            if (worldManager == null) worldManager = GameObject.Find("Scene Manager").GetComponent<WorldManager>();
-            worldManager.MoveDrop(name, transform.position);
             ctx.SendJson(new TransformMessage(transform));
         }
     }

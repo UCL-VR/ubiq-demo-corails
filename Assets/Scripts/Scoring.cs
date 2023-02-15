@@ -20,7 +20,7 @@ public enum ScoreEventType {
     Won,
 }
 
-public class Scoring : MonoBehaviour, INetworkComponent, INetworkObject {
+public class Scoring : MonoBehaviour {
     private const float BonusTimeScore = 1000f;
     private const float BonusTimeDecayRate = 1.25f;
     
@@ -47,14 +47,15 @@ public class Scoring : MonoBehaviour, INetworkComponent, INetworkObject {
     private void Awake() {
         OnScoreEvent ??= new ScoringEvent();
         OnScoreEvent.AddListener(UpdateScore);
-        roomClient = GameObject.Find("Network Scene with Social").GetComponent<RoomClient>();
-        roomClient.OnPeerAdded.AddListener(SendScore);
-        roomClient.OnJoinedRoom.AddListener(InitState);
+       
     }
 
     private void Start() {
         netContext = NetworkScene.Register(this);
         canvas.gameObject.SetActive(true);
+        roomClient = RoomClient.Find(this);
+        roomClient.OnPeerAdded.AddListener(SendScore);
+        roomClient.OnJoinedRoom.AddListener(InitState);
     }
 
     // Update is called once per frame
@@ -100,7 +101,7 @@ public class Scoring : MonoBehaviour, INetworkComponent, INetworkObject {
 
     public void ProcessMessage(ReferenceCountedSceneGraphMessage message) {
         var scoringMessage = message.FromJson<ScoringMessage>();
-        if (scoringMessage.TargetUuid == roomClient.Me.UUID) {
+        if (scoringMessage.TargetUuid == roomClient.Me.uuid) {
             if (scoringMessage.ScorePerType != null)
                 foreach ((int eventType, float eventScore) in scoringMessage.ScorePerType)
                     scorePerType[eventType] = eventScore;
@@ -115,19 +116,19 @@ public class Scoring : MonoBehaviour, INetworkComponent, INetworkObject {
         scorePerType[(int) scoringMessage.EventType] += scoreMapping[(int) scoringMessage.EventType];
     }
 
-    NetworkId INetworkObject.Id => new NetworkId(2817);
+    public NetworkId NetworkId => new NetworkId(2817);
 
     private void SendScore(IPeer newPeer) {
-        int mySuffix = roomClient.Me.UUID.Last();
+        int mySuffix = roomClient.Me.uuid.Last();
 
         // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-        bool doSend = roomClient.Peers.Select(peer => peer.UUID.Last()).All(peerSuffix => peerSuffix > mySuffix);
+        bool doSend = roomClient.Peers.Select(peer => peer.uuid.Last()).All(peerSuffix => peerSuffix > mySuffix);
 
         if (!doSend) return;
         var message = new ScoringMessage {
             ScorePerType = scorePerType.Select(x => new Tuple<int, float>(x.Key, x.Value)).ToList(),
             CurrentSessionTime = Time.time - startTimeOffset,
-            TargetUuid = newPeer.UUID
+            TargetUuid = newPeer.uuid
         };
         Debug.Log(message);
         netContext.SendJson(message);

@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace Tools
 {
-    public class Tool : MonoBehaviour, INetworkComponent, INetworkObject, IGraspable
+    public class Tool : MonoBehaviour, IGraspable
     {
         private static readonly int SrcBlend = Shader.PropertyToID("_SrcBlend");
         private static readonly int DstBlend = Shader.PropertyToID("_DstBlend");
@@ -58,6 +58,7 @@ namespace Tools
                 material.renderQueue = (int) RenderQueue.Transparent;
                 greyedMaterials.Add(material);
             }
+            worldManager = GameObject.Find("World Manager").GetComponent<WorldManager>();
         }
 
         public void Grasp(Hand controller)
@@ -98,8 +99,7 @@ namespace Tools
             }
         }
 
-        public NetworkId Id { get; private set; }
-
+        public virtual NetworkId NetworkId { get; protected set; }
 
         // stop the respawn timer, broadcast claim, and set positions to follow the controller
         protected void GraspShared(Hand controller)
@@ -130,7 +130,7 @@ namespace Tools
             rb = GetComponent<Rigidbody>();
             onScoreEvent = GameObject.Find("Scoring").GetComponent<Scoring>().OnScoreEvent;
 
-            Id = netID;
+            NetworkId = netID;
             if (!useCustomNetworking) ctx = NetworkScene.Register(this);
         }
 
@@ -209,8 +209,7 @@ namespace Tools
                 Debug.Log("Sound");
             }
 
-            if (worldManager == null) worldManager = GameObject.Find("Scene Manager").GetComponent<WorldManager>();
-            worldManager.OnWorldUpdate.Invoke(collision.gameObject, prefab);
+            worldManager.UpdateWorld(collision.gameObject, prefab);
             mineCoolDown = false;
             StartCoroutine(ResetCooldown());
             if (TryGetComponent(out Renderer toolRenderer)) toolRenderer.materials = greyedMaterials.ToArray();

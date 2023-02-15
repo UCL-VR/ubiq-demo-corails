@@ -12,6 +12,7 @@ namespace Tools
 
         private void Start() {
             parent = transform.parent.gameObject;
+            worldManager = GameObject.Find("World Manager").GetComponent<WorldManager>();
         }
 
         private void OnTriggerEnter(Collider collision) {
@@ -30,9 +31,7 @@ namespace Tools
 
             // if it was successfully added to inventory, destroy the object
             if (result) {
-                // Destroy(collision.gameObject);
-                if (worldManager == null) worldManager = GameObject.Find("Scene Manager").GetComponent<WorldManager>();
-                worldManager.OnWorldUpdate.Invoke(collision.gameObject, null); // destroy and don't spawn anything
+                worldManager.UpdateWorld(collision.gameObject, null); // destroy and don't spawn anything
             }
         }
     }

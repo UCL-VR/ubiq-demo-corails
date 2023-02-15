@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4467f6c3b47040840ab7f7665d8bddbe, type: 3}
+  m_Name: WorldManagerSpawnable
+  m_EditorClassIdentifier: 
+  prefabs:
+  - {fileID: 448351258565371058, guid: fd39a6188c463474e912c80d154df937, type: 3}
+  - {fileID: 8545060943940506883, guid: f6435bc5faf542d4f955930a43a77b1c, type: 3}
+  - {fileID: 5169527103741335614, guid: f4e40607d8f77424b97a95a1530e7e4d, type: 3}

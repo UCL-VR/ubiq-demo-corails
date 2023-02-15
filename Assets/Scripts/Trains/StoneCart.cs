@@ -9,7 +9,7 @@ using Ubiq.Rooms;
 using UnityEngine;
 
 // TODO: Combine with WoodCart into single parent
-public class StoneCart : MonoBehaviour, INetworkComponent, INetworkObject {
+public class StoneCart : MonoBehaviour {
     [SerializeField] private int stoneCount;
     private WorldManager worldManager;
 
@@ -49,14 +49,15 @@ public class StoneCart : MonoBehaviour, INetworkComponent, INetworkObject {
     }
 
     private void Awake() {
-        networkScene = (NetworkScene) FindObjectOfType(typeof(NetworkScene));
-        roomClient = networkScene.GetComponent<RoomClient>();
-        roomClient.OnPeerAdded.AddListener(SendTrainState);
-        roomClient.OnJoinedRoom.AddListener(InitState);
     }
 
     private void Start() {
         netContext = NetworkScene.Register(this);
+        networkScene = netContext.Scene;
+        roomClient = RoomClient.Find(this);
+        roomClient.OnPeerAdded.AddListener(SendTrainState);
+        roomClient.OnJoinedRoom.AddListener(InitState);
+        worldManager = GameObject.Find("World Manager").GetComponent<WorldManager>();
     }
 
     private void OnTriggerEnter(Collider other) {
@@ -75,8 +76,7 @@ public class StoneCart : MonoBehaviour, INetworkComponent, INetworkObject {
             if (!other.TryGetComponent(out ResourceDropManager resourceDropManager)) return;
             if (resourceDropManager.type == "stone")
             {
-                if (worldManager == null) worldManager = GameObject.Find("Scene Manager").GetComponent<WorldManager>();
-                worldManager.OnWorldUpdate.Invoke(other.gameObject, null); // destroy and don't spawn anything
+                worldManager.UpdateWorld(other.gameObject, null); // destroy and don't spawn anything
                 StoneCount += 1;
                 netContext.SendJson(new Message(StoneCount, false));
             }
@@ -91,7 +91,7 @@ public class StoneCart : MonoBehaviour, INetworkComponent, INetworkObject {
         ready = true;
     }
 
-    NetworkId INetworkObject.Id => new NetworkId(633013);
+    public NetworkId NetworkId => new NetworkId(633013);
 
     private void UpdateStone() {
         while (currentObjs.Count > StoneCount) {
@@ -110,10 +110,10 @@ public class StoneCart : MonoBehaviour, INetworkComponent, INetworkObject {
     }
 
     private void SendTrainState(IPeer newPeer) {
-        int mySuffix = roomClient.Me.UUID.Last();
+        int mySuffix = roomClient.Me.uuid.Last();
 
         // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-        bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+        bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
             .All(peerSuffix => peerSuffix > mySuffix);
 
 

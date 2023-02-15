@@ -9,7 +9,7 @@ using UnityEngine.Events;
 using Utils;
 
 namespace Trains {
-    public class TrackManagerSnake : MonoBehaviour, INetworkComponent, INetworkObject {
+    public class TrackManagerSnake : MonoBehaviour {
         public GameObject objectStraightTrack;
         public GameObject objectCurvedTrack;
         public GameObject objectEndPost;
@@ -100,12 +100,12 @@ namespace Trains {
             }
         }
 
-        NetworkId INetworkObject.Id => new NetworkId(887845);
+        public NetworkId NetworkId => new NetworkId(887845);
 
         private void SendTrackList(IPeer newPeer) {
-            int mySuffix = roomClient.Me.UUID.Last();
+            int mySuffix = roomClient.Me.uuid.Last();
             // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
                 .All(peerSuffix => peerSuffix > mySuffix);
 
             if (!doSend) return;

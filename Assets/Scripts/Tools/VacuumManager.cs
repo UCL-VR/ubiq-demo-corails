@@ -9,7 +9,7 @@ using Ubiq.XR;
 using UnityEngine;
 
 namespace Tools {
-    public class VacuumManager : Tool, INetworkComponent, INetworkObject, IGraspable, IUseable {
+    public class VacuumManager : Tool, IGraspable, IUseable {
         public GameObject suctionZone;
         public int inventoryCount;
         public int inventoryItem; // 0 = None, 1 = log, 2 = rock, 3 = rail
@@ -100,7 +100,7 @@ namespace Tools {
             }
         }
 
-        public new NetworkId Id { get; } = new NetworkId(1002);
+        public override NetworkId NetworkId => new NetworkId(1002);
 
         public void Use(Hand controller) {
             SuctionMode(true); // enable suction/rail placement
@@ -200,10 +200,10 @@ namespace Tools {
             }
         }
         private void SendGunState(IPeer newPeer) {
-            int mySuffix = roomClient.Me.UUID.Last();
+            int mySuffix = roomClient.Me.uuid.Last();
 
             // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
                 .All(peerSuffix => peerSuffix > mySuffix);
 
 

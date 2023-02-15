@@ -3,7 +3,7 @@ using Ubiq.XR;
 using UnityEngine;
 
 namespace ResourceDrops {
-    public class RailManager : MonoBehaviour, INetworkComponent, INetworkObject, IGraspable, IUseable {
+    public class RailManager : MonoBehaviour, IGraspable, IUseable {
         public bool owner;
 
         private NetworkContext ctx;

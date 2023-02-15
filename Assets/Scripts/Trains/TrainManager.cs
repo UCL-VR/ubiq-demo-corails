@@ -9,7 +9,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Trains {
-    public class TrainManager : MonoBehaviour, INetworkComponent, INetworkObject {
+    public class TrainManager : MonoBehaviour {
         public TrackManagerSnake trackManager;
         public int trackIndex;
         private int startingTrackIndex;
@@ -27,7 +27,6 @@ namespace Trains {
         public bool won;
         public bool failed;
 
-        public NetworkScene networkScene;
 
         public bool ready;
         private NetworkContext netContext;
@@ -54,10 +53,6 @@ namespace Trains {
 
         private void Awake() {
             startingTrackIndex = trackIndex;
-            networkScene = (NetworkScene) FindObjectOfType(typeof(NetworkScene));
-            roomClient = networkScene.GetComponent<RoomClient>();
-            roomClient.OnPeerAdded.AddListener(SendTrainState);
-            roomClient.OnJoinedRoom.AddListener(InitCar);
         }
 
         public void Reset() {
@@ -83,6 +78,9 @@ namespace Trains {
             repeatTrack = new List<TrackPiece>();
             netContext = NetworkScene.Register(this);
             transform.position = trackManager.tracks[trackIndex].gameObject.transform.position;
+            roomClient = RoomClient.Find(this);
+            roomClient.OnPeerAdded.AddListener(SendTrainState);
+            roomClient.OnJoinedRoom.AddListener(InitCar);
         }
 
         private void UpdateTrack() {
@@ -118,13 +116,13 @@ namespace Trains {
                 new Vector2(currentTrack.x, currentTrack.y)) >= 0.5f) {
                 trackIndex += 1;
                 UpdateTrack();
-                
+
             }
             if (nextTrack == null) return;
             if (currentTrack == null) return;
             if (stop) return;
 
-            
+
             Vector3 nextTrackLocation = nextTrack.gameObject.transform.position;
             // calculates offset of position of the entrypoint of the next rail (from the next rail's center)
             Vector3 offset = Quaternion.Euler(0, ((int)nextTrack.connections[0] + 0) % 4 * 90f, 0) * Vector3.forward * 0.5f;
@@ -133,16 +131,16 @@ namespace Trains {
 
             float step = GetSpeed() * Time.deltaTime;
             transform.position = Vector3.MoveTowards(position, nextTrackLocation, step);
-            
-            if (currentTrack.connections.Sum(x=> (int)x) % 2 == 0) return;  // track is straight
+
+            if (currentTrack.connections.Sum(x => (int)x) % 2 == 0) return;  // track is straight
             bool isNorthSouth = (int)currentTrack.connections[1] % 2 == 0;  // exit of turn is north or south
 
             Vector3 localTrackOffset = currentTrack.gameObject.transform.position - position;
-            double rotationDegrees = -Math.Atan2(localTrackOffset.x * (isNorthSouth? -1 : 1), localTrackOffset.z) * 180 / Math.PI;
+            double rotationDegrees = -Math.Atan2(localTrackOffset.x * (isNorthSouth ? -1 : 1), localTrackOffset.z) * 180 / Math.PI;
             rotationDegrees *= isNorthSouth ? -1 : 1;
             rotationDegrees += isNorthSouth ? 180 : 0;
             rotationDegrees %= 360;
-            int rotationQuadrant = (int) rotationDegrees / 90;
+            int rotationQuadrant = (int)rotationDegrees / 90;
             float rotationOffset = rotateCurve.Evaluate((float)(Math.Abs(rotationDegrees) % 90));
 
             transform.rotation = Quaternion.Euler(0, rotationQuadrant * 90 + Math.Sign(rotationDegrees) * rotationOffset, 0) * Quaternion.Euler(0, 270, 0);
@@ -173,14 +171,14 @@ namespace Trains {
             ready = true;
         }
 
-        NetworkId INetworkObject.Id => new NetworkId(600000);
+        public NetworkId NetworkId => new NetworkId(600000);
 
 
         private void SendTrainState(IPeer newPeer) {
-            int mySuffix = roomClient.Me.UUID.Last();
+            int mySuffix = roomClient.Me.uuid.Last();
 
             // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+            bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
                 .All(peerSuffix => peerSuffix > mySuffix);
 
 

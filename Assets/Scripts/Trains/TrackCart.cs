@@ -7,7 +7,7 @@ using Ubiq.Messaging;
 using Ubiq.Rooms;
 using UnityEngine;
 
-public class TrackCart : MonoBehaviour, INetworkComponent, INetworkObject {
+public class TrackCart : MonoBehaviour {
     [SerializeField] private int trackCount;
 
     public GameObject woodObj;
@@ -15,9 +15,9 @@ public class TrackCart : MonoBehaviour, INetworkComponent, INetworkObject {
     public WoodCart woodCart;
     public StoneCart stoneCart;
 
-    public NetworkScene networkScene;
-
     public bool ready;
+
+    public NetworkId NetworkId => new NetworkId(333016);
 
     private readonly List<Vector3> positions = new List<Vector3> {
         new Vector3(0.0022f, -0.0011f, 0.0022f),
@@ -50,16 +50,12 @@ public class TrackCart : MonoBehaviour, INetworkComponent, INetworkObject {
         }
     }
 
-    private void Awake() {
-        networkScene = (NetworkScene) FindObjectOfType(typeof(NetworkScene));
-        roomClient = networkScene.GetComponent<RoomClient>();
-        roomClient.OnPeerAdded.AddListener(SendTrainState);
-        roomClient.OnJoinedRoom.AddListener(InitState);
-    }
-
     private void Start() {
         InvokeRepeating("BuildTrack", 0f, 5f);
         netContext = NetworkScene.Register(this);
+        roomClient = RoomClient.Find(this);
+        roomClient.OnPeerAdded.AddListener(SendTrainState);
+        roomClient.OnJoinedRoom.AddListener(InitState);
     }
 
     private void OnTriggerEnter(Collider other) {
@@ -85,7 +81,9 @@ public class TrackCart : MonoBehaviour, INetworkComponent, INetworkObject {
         ready = true;
     }
 
-    NetworkId INetworkObject.Id => new NetworkId(333016);
+    private void Update() {
+        UpdateTrack();
+    }
 
     private void UpdateTrack() {
         while (currentObjs.Count > TrackCount) {
@@ -123,10 +121,10 @@ public class TrackCart : MonoBehaviour, INetworkComponent, INetworkObject {
 
 
     private void SendTrainState(IPeer newPeer) {
-        int mySuffix = roomClient.Me.UUID.Last();
+        int mySuffix = roomClient.Me.uuid.Last();
 
         // use last character of UUID as integer, lowest integer in room sends new updates to new peer
-        bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.UUID.Last())
+        bool doSend = roomClient.Peers.Where(peer => peer != newPeer).Select(peer => peer.uuid.Last())
             .All(peerSuffix => peerSuffix > mySuffix);
 
 
