@@ -13055,7 +13055,6 @@ MonoBehaviour:
   _stop: 1
   won: 0
   failed: 0
-  networkScene: {fileID: 0}
   ready: 0
   smokeParticles: {fileID: 657246027}
   explosionParticles: {fileID: 642410178}
@@ -21643,7 +21642,6 @@ MonoBehaviour:
     connections: 
   distance: 0
   presetID: 200
-  networkScene: {fileID: 0}
   ready: 0
 --- !u!64 &949272842
 MeshCollider:
@@ -23289,6 +23287,14 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 999065837, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 9.93
+      objectReference: {fileID: 0}
+    - target: {fileID: 999065837, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -10.32
+      objectReference: {fileID: 0}
     - target: {fileID: 50961363149199893, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
       propertyPath: m_Texture
       value: 
@@ -23389,6 +23395,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2642065777703140922, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2642065777872049631, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -23427,7 +23437,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2642065778884258268, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 9.9
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2642065778884258268, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
       propertyPath: m_LocalPosition.y
@@ -23435,7 +23445,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2642065778884258268, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -10.01
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2642065778884258268, guid: 46c1f5d5a11cf5042886aabd56e7b9d7, type: 3}
       propertyPath: m_LocalRotation.w
@@ -42245,7 +42255,6 @@ MonoBehaviour:
     connections: 
   distance: 0
   presetID: 400
-  networkScene: {fileID: 0}
   ready: 0
 --- !u!64 &1635852237
 MeshCollider:
@@ -42277,7 +42286,6 @@ MonoBehaviour:
   woodObj: {fileID: 919132149155446097, guid: 7271bb19c89960b4695ed5e4239ac6b3, type: 3}
   woodCart: {fileID: 949272843}
   stoneCart: {fileID: 1936497505}
-  networkScene: {fileID: 0}
   ready: 0
 --- !u!135 &1635852242
 SphereCollider:
@@ -47158,7 +47166,6 @@ MonoBehaviour:
     connections: 
   distance: 0
   presetID: 300
-  networkScene: {fileID: 0}
   ready: 0
 --- !u!64 &1936497504
 MeshCollider:
@@ -49319,7 +49326,6 @@ MonoBehaviour:
     connections: 
   distance: 0
   presetID: 100
-  networkScene: {fileID: 0}
   ready: 0
 --- !u!64 &2042630072
 MeshCollider:

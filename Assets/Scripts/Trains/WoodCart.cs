@@ -60,6 +60,7 @@ public class WoodCart : MonoBehaviour {
             if (value <= 0) value = 0;
             woodCount = value;
             UpdateWood();
+            SendUpdate();
         }
     }
 
@@ -83,7 +84,6 @@ public class WoodCart : MonoBehaviour {
                     WoodCount += vacuumManager.inventoryCount;
                     vacuumManager.inventoryCount = 0;
                     vacuumManager.inventoryItem = 0;
-                    netContext.SendJson(new Message(woodCount, false));
                 }
         }
         else
@@ -93,9 +93,12 @@ public class WoodCart : MonoBehaviour {
             {
                 worldManager.UpdateWorld(other.gameObject, null); // destroy and don't spawn anything
                 WoodCount += 1;
-                netContext.SendJson(new Message(WoodCount, false));
             }
         }
+    }
+
+    private void SendUpdate() {
+        netContext.SendJson(new Message(WoodCount, false));
     }
 
     public void ProcessMessage(ReferenceCountedSceneGraphMessage message) {

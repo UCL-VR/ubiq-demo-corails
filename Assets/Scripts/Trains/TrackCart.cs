@@ -47,6 +47,7 @@ public class TrackCart : MonoBehaviour {
             if (value <= 0) value = 0;
             trackCount = value;
             UpdateTrack();
+            SendUpdate();
         }
     }
 
@@ -106,7 +107,6 @@ public class TrackCart : MonoBehaviour {
             woodCart.WoodCount -= 2;
             stoneCart.StoneCount -= 1;
             TrackCount += 2;
-            netContext.SendJson(new Message(trackCount, false));
         }
     }
 
@@ -116,9 +116,11 @@ public class TrackCart : MonoBehaviour {
         vacuumManager.inventoryCount += 1;
         vacuumManager.inventoryItem = 3;
         TrackCount -= 1;
-        netContext.SendJson(new Message(trackCount, false));
     }
 
+    private void SendUpdate() {
+        netContext.SendJson(new Message(trackCount, false));
+    }
 
     private void SendTrainState(IPeer newPeer) {
         int mySuffix = roomClient.Me.uuid.Last();

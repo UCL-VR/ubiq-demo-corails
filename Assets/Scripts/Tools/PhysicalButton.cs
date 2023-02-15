@@ -93,7 +93,7 @@ namespace Tools {
             public bool particles;
 
             public Message(Transform transform, bool owner, bool particles) {
-                this.transform = new TransformMessage(transform);
+                this.transform = new TransformMessage() { position = transform.position, rotation = transform.rotation };
                 this.owner = owner;
                 this.particles = particles;
             }

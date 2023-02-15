@@ -15,8 +15,6 @@ public class StoneCart : MonoBehaviour {
 
     public GameObject stoneObj;
 
-    public NetworkScene networkScene;
-
     public bool ready;
 
     private readonly List<Vector3> positions = new List<Vector3> {
@@ -45,6 +43,7 @@ public class StoneCart : MonoBehaviour {
             if (value <= 0) value = 0;
             stoneCount = value;
             UpdateStone();
+            SendUpdate();
         }
     }
 
@@ -53,7 +52,6 @@ public class StoneCart : MonoBehaviour {
 
     private void Start() {
         netContext = NetworkScene.Register(this);
-        networkScene = netContext.Scene;
         roomClient = RoomClient.Find(this);
         roomClient.OnPeerAdded.AddListener(SendTrainState);
         roomClient.OnJoinedRoom.AddListener(InitState);
@@ -68,7 +66,6 @@ public class StoneCart : MonoBehaviour {
                     StoneCount += vacuumManager.inventoryCount;
                     vacuumManager.inventoryCount = 0;
                     vacuumManager.inventoryItem = 0;
-                    netContext.SendJson(new Message(stoneCount, false));
                 }
         }
         else
@@ -78,7 +75,6 @@ public class StoneCart : MonoBehaviour {
             {
                 worldManager.UpdateWorld(other.gameObject, null); // destroy and don't spawn anything
                 StoneCount += 1;
-                netContext.SendJson(new Message(StoneCount, false));
             }
         }
     }
@@ -89,6 +85,10 @@ public class StoneCart : MonoBehaviour {
         stoneCount = msg.StoneCount;
         UpdateStone();
         ready = true;
+    }
+
+    public void SendUpdate() {
+        netContext.SendJson(new Message(StoneCount, false));
     }
 
     public NetworkId NetworkId => new NetworkId(633013);
